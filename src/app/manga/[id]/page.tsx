@@ -7,17 +7,10 @@ import ChapterList from "@/components/ChapterList";
 import GalleryViewer from "@/components/GalleryViewer";
 import ConfirmModal from "@/components/ConfirmModal";
 import Toast from "@/components/Toast";
-import { ArrowLeft, BookOpen, ExternalLink, Trash2, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookOpen, ExternalLink, Trash2, RefreshCw, Download, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-
-interface NewChapter {
-	chapterNumber: number;
-	title: string;
-	url: string;
-	date: string;
-}
 
 interface Chapter {
 	id: number;
@@ -61,7 +54,13 @@ function MangaDetailContent() {
 	const [error, setError] = useState("");
 	const [deleting, setDeleting] = useState(false);
 	const [checkingUpdates, setCheckingUpdates] = useState(false);
-	const [newChapters, setNewChapters] = useState<NewChapter[] | null>(null);
+	const [updateModal, setUpdateModal] = useState<{
+		open: boolean;
+		minChapter: number;
+		maxChapter: number;
+		total: number;
+	}>({ open: false, minChapter: 1, maxChapter: 1, total: 0 });
+	const [scraping, setScraping] = useState(false);
 	const [readingHistory, setReadingHistory] = useState<ReadingHistory | null>(null);
 	const [confirmModal, setConfirmModal] = useState<{
 		open: boolean;
@@ -191,19 +190,49 @@ function MangaDetailContent() {
 
 	const handleCheckUpdates = async () => {
 		setCheckingUpdates(true);
-		setNewChapters(null);
 		try {
 			const res = await fetch(`/api/manga/${manga.id}/check-updates`, { method: "POST" });
 			if (!res.ok) throw new Error("Failed to check updates");
 			const data = await res.json();
-			setNewChapters(data.newChapters);
-			if (data.newChapters.length === 0) {
+			const chapters: { chapterNumber: number }[] = data.newChapters;
+			if (chapters.length === 0) {
 				setToast({ message: "No new chapters found", type: "info" });
+				return;
 			}
+			const chapterNums = chapters.map((ch) => ch.chapterNumber);
+			const min = Math.min(...chapterNums);
+			const max = Math.max(...chapterNums);
+			setUpdateModal({ open: true, minChapter: min, maxChapter: max, total: chapters.length });
 		} catch {
 			setToast({ message: "Failed to check updates", type: "error" });
 		} finally {
 			setCheckingUpdates(false);
+		}
+	};
+
+	const handleStartScrape = async () => {
+		setScraping(true);
+		try {
+			const res = await fetch("/api/scrape", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					url: manga.sourceUrl,
+					startChapter: updateModal.minChapter,
+					endChapter: updateModal.maxChapter,
+				}),
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.error || "Failed to start scrape");
+			}
+			const result = await res.json();
+			setUpdateModal({ open: false, minChapter: 1, maxChapter: 1, total: 0 });
+			window.open(`/scrape/${result.job.id}`, "_blank");
+		} catch (err) {
+			setToast({ message: err instanceof Error ? err.message : "Failed to start scrape", type: "error" });
+		} finally {
+			setScraping(false);
 		}
 	};
 
@@ -321,31 +350,6 @@ function MangaDetailContent() {
 				)}
 			</div>
 
-			{/* New Chapters Found */}
-			{newChapters && newChapters.length > 0 && (
-				<div className="bg-white rounded-lg shadow-md p-6">
-					<h2 className="text-lg font-semibold text-gray-900 mb-4">New Chapters Found ({newChapters.length})</h2>
-					<div className="max-h-[500px] overflow-y-auto space-y-2">
-						{newChapters.map((ch, i) => (
-							<div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-								<div>
-									<span className="font-medium text-gray-900">Chapter {ch.chapterNumber}</span>
-									{ch.title && <span className="text-gray-600 ml-2">- {ch.title}</span>}
-								</div>
-								<a
-									href={ch.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="text-blue-600 hover:text-blue-800 text-sm"
-								>
-									View →
-								</a>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
-
 			{/* Chapter List */}
 			<ChapterList chapters={manga.chapters} mangaId={manga.id} readingHistory={readingHistory} />
 
@@ -372,6 +376,101 @@ function MangaDetailContent() {
 				onConfirm={confirmModal.onConfirm}
 				onCancel={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
 			/>
+
+			{/* Scrape Update Modal */}
+			{updateModal.open && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+					<div className="bg-white rounded-xl px-8 py-6 max-w-md w-full mx-4 relative">
+						<button
+							onClick={() => setUpdateModal({ open: false, minChapter: 1, maxChapter: 1, total: 0 })}
+							className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+						>
+							<X className="w-5 h-5" />
+						</button>
+
+						<div className="flex items-center gap-3 mb-4">
+							<div className="p-2 bg-green-100 rounded-lg">
+								<Download className="w-5 h-5 text-green-600" />
+							</div>
+							<div>
+								<h3 className="text-lg font-semibold text-gray-900">Download New Chapters</h3>
+								<p className="text-sm text-gray-500">{updateModal.total} undownloaded chapters found</p>
+							</div>
+						</div>
+
+						<div className="space-y-4 mb-6">
+							<div>
+								<label className="block text-sm font-medium text-gray-700 mb-1">Source URL</label>
+								<p className="text-sm text-gray-600 truncate">{manga.sourceUrl}</p>
+							</div>
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">From Chapter</label>
+									<input
+										type="number"
+										min={1}
+										value={updateModal.minChapter}
+										onChange={(e) => {
+											const val = parseInt(e.target.value, 10);
+											if (!isNaN(val) && val >= 1) {
+												setUpdateModal((prev) => ({
+													...prev,
+													minChapter: Math.min(val, prev.maxChapter),
+												}));
+											}
+										}}
+										className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+									/>
+								</div>
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">To Chapter</label>
+									<input
+										type="number"
+										min={1}
+										value={updateModal.maxChapter}
+										onChange={(e) => {
+											const val = parseInt(e.target.value, 10);
+											if (!isNaN(val) && val >= 1) {
+												setUpdateModal((prev) => ({
+													...prev,
+													maxChapter: Math.max(val, prev.minChapter),
+												}));
+											}
+										}}
+										className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+									/>
+								</div>
+							</div>
+						</div>
+
+						<div className="flex gap-3">
+							<button
+								onClick={() => setUpdateModal({ open: false, minChapter: 1, maxChapter: 1, total: 0 })}
+								className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={handleStartScrape}
+								disabled={scraping}
+								className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+							>
+								{scraping ? (
+									<>
+										<RefreshCw className="w-4 h-4 animate-spin" />
+										Starting...
+									</>
+								) : (
+									<>
+										<Download className="w-4 h-4" />
+										Start Download
+									</>
+								)}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 
 			{toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 		</div>
