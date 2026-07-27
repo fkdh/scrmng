@@ -3,10 +3,12 @@
 import { useState, useCallback } from 'react';
 import { BookOpen, Download, CheckCircle, Clock, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import ConfirmModal from './ConfirmModal';
 import Toast from './Toast';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import ScrapeModal from './ScrapeModal';
 
 interface Manga {
   id: number;
@@ -34,6 +36,7 @@ interface DashboardProps {
 export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }: DashboardProps) {
   const mangaList = mangaListProp || [];
   const stats = statsProp || { totalManga: 0, totalChapters: 0, totalImages: 0, pendingJobs: 0 };
+  const router = useRouter();
 
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({
     open: false,
@@ -42,6 +45,21 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
     onConfirm: () => {},
   });
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const [scrapeModal, setScrapeModal] = useState(false);
+
+  const handleCreateScrape = async (url: string, startChapter: number, endChapter: number) => {
+    const res = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, startChapter, endChapter }),
+    });
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      throw new Error(result.error || 'Failed to start scraping');
+    }
+    const result = await res.json();
+    router.push(`/scrape/${result.job.id}`);
+  };
 
   const handleDelete = async (e: React.MouseEvent, mangaId: number, title: string) => {
     e.preventDefault();
@@ -119,13 +137,14 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
 
       {/* Quick Actions */}
       <div className="flex justify-end">
-        <Link
-          href="/scrape"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => setScrapeModal(true)}
+          icon={<Plus className="w-5 h-5" />}
         >
-          <Plus className="w-5 h-5" />
-          <span>New Scrape</span>
-        </Link>
+          New Scrape
+        </Button>
       </div>
 
       {/* Manga List */}
@@ -138,13 +157,15 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
           <div className="px-6 py-12 text-center">
             <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">No manga yet. Start by scraping a manga!</p>
-            <Link
-              href="/scrape"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setScrapeModal(true)}
+              icon={<Plus className="w-5 h-5" />}
+              className="mt-4"
             >
-              <Plus className="w-5 h-5" />
-              <span>Start Scraping</span>
-            </Link>
+              Start Scraping
+            </Button>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
@@ -205,6 +226,13 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
         variant="danger"
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+      />
+
+      <ScrapeModal
+        open={scrapeModal}
+        mode="create"
+        onClose={() => setScrapeModal(false)}
+        onSubmit={handleCreateScrape}
       />
 
       {toast && (

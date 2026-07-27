@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from './AuthProvider';
-import { LogOut, Home, Download, BookOpen } from 'lucide-react';
+import { LogOut, Home, BookOpen } from 'lucide-react';
 import Button from './ui/Button';
 
 export default function Navbar() {
@@ -33,13 +33,6 @@ export default function Navbar() {
               >
                 <Home className="w-4 h-4" />
                 <span>Dashboard</span>
-              </Link>
-              <Link
-                href="/scrape"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                <span>Scrape</span>
               </Link>
             </div>
           </div>
