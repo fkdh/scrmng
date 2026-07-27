@@ -71,6 +71,7 @@ export default function GalleryViewer({
 		return saved === "ltr" || saved === "rtl" || saved === "scroll" ? saved : "ltr";
 	});
 	const scrollLockRef = useRef(false);
+	const scrollToPageFromInputRef = useRef(false);
 
 	const chapter = chapters[currentChapterIndex];
 	const totalImages = chapter?.totalImages || 0;
@@ -91,6 +92,13 @@ export default function GalleryViewer({
 	useEffect(() => {
 		localStorage.setItem("manga-read-mode", readMode);
 	}, [readMode]);
+
+	// Reset dismissed chapter modal when navigating away from last page
+	useEffect(() => {
+		if (!isLastImage && dismissedChapterId !== null) {
+			setDismissedChapterId(null);
+		}
+	}, [isLastImage, dismissedChapterId]);
 
 	const getImageUrl = (index: number) => {
 		return `/api/images/${source}/${mangaSlug}/chapter-${chapterNum}/${index}.jpg`;
@@ -136,14 +144,14 @@ export default function GalleryViewer({
 	const goToNextChapter = useCallback(() => {
 		if (nextChapter) {
 			const nextNum = parseFloat(nextChapter.chapterNumber).toString();
-			router.push(`/manga/${mangaId}?chapter=${nextNum}`);
+			router.push(`/manga/${mangaId}?chapter=${nextNum}&page=1`);
 		}
 	}, [nextChapter, mangaId, router]);
 
 	const goToPrevChapter = useCallback(() => {
 		if (prevChapter) {
 			const prevNum = parseFloat(prevChapter.chapterNumber).toString();
-			router.push(`/manga/${mangaId}?chapter=${prevNum}`);
+			router.push(`/manga/${mangaId}?chapter=${prevNum}&page=1`);
 		}
 	}, [prevChapter, mangaId, router]);
 
@@ -331,20 +339,17 @@ export default function GalleryViewer({
 			if (scrollLockRef.current) return;
 			cancelAnimationFrame(rafId);
 			rafId = requestAnimationFrame(() => {
-				const scrollTop = container.scrollTop;
-				const viewHeight = container.clientHeight;
-				const viewportCenter = scrollTop + viewHeight / 2;
+				const containerRect = container.getBoundingClientRect();
+				const containerCenter = containerRect.top + containerRect.height / 2;
 
 				const imgs = container.querySelectorAll<HTMLElement>("[data-page]");
 				let bestPage = 1;
 				let bestDist = Infinity;
 
 				imgs.forEach((el) => {
-					const top = el.offsetTop;
-					const h = el.offsetHeight;
-					// CSS zoom affects layout, so offsetTop/offsetHeight already include zoom
-					const imgCenter = top + h / 2;
-					const dist = Math.abs(imgCenter - viewportCenter);
+					const elRect = el.getBoundingClientRect();
+					const imgCenter = elRect.top + elRect.height / 2;
+					const dist = Math.abs(imgCenter - containerCenter);
 					if (dist < bestDist) {
 						bestDist = dist;
 						bestPage = parseInt(el.dataset.page || "1", 10);
@@ -362,20 +367,42 @@ export default function GalleryViewer({
 		};
 	}, [isScrollMode, totalImages, chapter?.id, zoom]);
 
-	// Restore scroll position when zooming out in scroll mode
+	// Scroll to page when input changes in scroll mode
 	useEffect(() => {
-		if (!isScrollMode || zoom > 1) return;
+		if (!isScrollMode || !scrollToPageFromInputRef.current) return;
+		scrollToPageFromInputRef.current = false;
+		const container = scrollContainerRef.current;
+		if (!container) return;
+		const el = container.querySelector<HTMLElement>(`[data-page="${currentImage}"]`);
+		if (el) {
+			scrollLockRef.current = true;
+			const containerRect = container.getBoundingClientRect();
+			const elRect = el.getBoundingClientRect();
+			const offset = elRect.top + elRect.height / 2 - (containerRect.top + containerRect.height / 2);
+			container.scrollTop += offset;
+			setTimeout(() => { scrollLockRef.current = false; }, 100);
+		}
+	}, [currentImage, isScrollMode]);
+
+	// Scroll mode: maintain viewport position relative to current page on any zoom change
+	useEffect(() => {
+		if (!isScrollMode) return;
 		const container = scrollContainerRef.current;
 		if (!container) return;
 
 		scrollLockRef.current = true;
-		const el = container.querySelector<HTMLElement>(`[data-page="${currentImage}"]`);
-		if (el) {
-			container.scrollTop = el.offsetTop - (container.clientHeight - el.offsetHeight) / 2;
-		}
-		setTimeout(() => {
-			scrollLockRef.current = false;
-		}, 100);
+		requestAnimationFrame(() => {
+			const el = container.querySelector<HTMLElement>(`[data-page="${currentImage}"]`);
+			if (el) {
+				const containerRect = container.getBoundingClientRect();
+				const elRect = el.getBoundingClientRect();
+				const offset = elRect.top + elRect.height / 2 - (containerRect.top + containerRect.height / 2);
+				container.scrollTop += offset;
+			}
+			setTimeout(() => {
+				scrollLockRef.current = false;
+			}, 100);
+		});
 	}, [zoom, isScrollMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Scroll mode: auto-scroll to current image on mode switch
@@ -434,6 +461,7 @@ export default function GalleryViewer({
 						onChange={(e) => {
 							const val = parseInt(e.target.value, 10);
 							if (val >= 1 && val <= totalImages) {
+								if (isScrollMode) scrollToPageFromInputRef.current = true;
 								setCurrentImage(val);
 								if (isPageMode) resetZoomAndPan();
 							}
@@ -479,7 +507,7 @@ export default function GalleryViewer({
 							const ch = chapters[idx];
 							if (ch) {
 								const num = parseFloat(ch.chapterNumber).toString();
-								router.push(`/manga/${mangaId}?chapter=${num}`);
+								router.push(`/manga/${mangaId}?chapter=${num}&page=1`);
 							}
 						}}
 						className="bg-white/10 text-white text-xs rounded px-1 sm:px-2 py-1 border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/50"
@@ -644,7 +672,7 @@ export default function GalleryViewer({
 
 			{/* Chapter Complete Overlay */}
 			{showChapterComplete && (
-				<div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+				<div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40">
 					<div className="bg-black/70 rounded-xl px-8 py-6 text-center relative">
 						<button
 							onClick={() => setDismissedChapterId(chapter?.id ?? null)}

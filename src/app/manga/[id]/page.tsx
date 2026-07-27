@@ -77,6 +77,7 @@ function MangaDetailContent() {
 	const [toast, setToast] = useState<{ message: string; type: "error" | "success" | "info" } | null>(null);
 
 	const selectedChapter = searchParams.get("chapter");
+	const pageParam = searchParams.get("page");
 
 	useEffect(() => {
 		async function fetchManga() {
@@ -358,7 +359,7 @@ function MangaDetailContent() {
 					source={manga.source}
 					chapters={sortedChapters}
 					currentChapterIndex={currentChapterIndex}
-					initialImage={historyChapterNum === selectedChapter && readingHistory ? readingHistory.lastImage : 1}
+					initialImage={pageParam ? parseInt(pageParam, 10) || 1 : (historyChapterNum === selectedChapter && readingHistory ? readingHistory.lastImage : 1)}
 				/>
 			)}
 
