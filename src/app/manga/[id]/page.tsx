@@ -96,6 +96,24 @@ function MangaDetailContent() {
 		fetchManga();
 	}, [params.id]);
 
+	// Poll manga data while any chapter is still downloading
+	useEffect(() => {
+		const isDownloading = manga?.chapters.some((ch) => ch.status === "downloading");
+		if (!isDownloading) return;
+
+		const interval = setInterval(async () => {
+			try {
+				const res = await fetch(`/api/manga/${params.id}`);
+				if (res.ok) {
+					const data = await res.json();
+					setManga(data.manga);
+				}
+			} catch {}
+		}, 3000);
+
+		return () => clearInterval(interval);
+	}, [params.id, manga?.chapters]);
+
 	useEffect(() => {
 		async function fetchHistory() {
 			try {

@@ -10,7 +10,6 @@ interface ProgressData {
   total: number;
   currentChapter: string | null;
   errorMessage: string | null;
-  done?: boolean;
 }
 
 interface ProgressTrackerProps {
@@ -20,114 +19,54 @@ interface ProgressTrackerProps {
 
 export default function ProgressTracker({ jobId, onComplete }: ProgressTrackerProps) {
   const [progress, setProgress] = useState<ProgressData | null>(null);
-  const [connected, setConnected] = useState(false);
 
   const fetchProgress = useCallback(async () => {
     try {
-      const response = await fetch(`/api/scrape/progress?jobId=${jobId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch progress');
+      const res = await fetch(`/api/scrape/${jobId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const job = data.job;
+
+      const progressData: ProgressData = {
+        jobId: job.id,
+        status: job.status,
+        progress: job.progress || 0,
+        total: job.total || 0,
+        currentChapter: job.currentChapter,
+        errorMessage: job.errorMessage,
+      };
+
+      setProgress(progressData);
+
+      if (job.status === 'completed' || job.status === 'error') {
+        onComplete?.();
+        return true; // signal to stop polling
       }
-      return response.body;
-    } catch (error) {
-      console.error('Error fetching progress:', error);
-      return null;
+    } catch {
+      // ignore errors
     }
-  }, [jobId]);
+    return false;
+  }, [jobId, onComplete]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    // Initial fetch
+    fetchProgress();
 
-    const connectSSE = async () => {
-      try {
-        // Use fetch with ReadableStream for SSE
-        const response = await fetch(`/api/scrape/progress?jobId=${jobId}`, {
-          signal: controller.signal,
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to connect');
-        }
+    // Poll every 2 seconds
+    const interval = setInterval(async () => {
+      const done = await fetchProgress();
+      if (done) clearInterval(interval);
+    }, 2000);
 
-        const reader = response.body?.getReader();
-        if (!reader) return;
-
-        setConnected(true);
-        const decoder = new TextDecoder();
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                setProgress(data);
-
-                if (data.done || data.status === 'completed' || data.status === 'error') {
-                  onComplete?.();
-                  return;
-                }
-              } catch {
-                // Ignore parse errors
-              }
-            }
-          }
-        }
-      } catch (error) {
-        if ((error as Error).name === 'AbortError') {
-          return;
-        }
-        console.error('SSE connection error:', error);
-        setConnected(false);
-
-        // Fallback: poll every 2 seconds
-        const interval = setInterval(async () => {
-          try {
-            const res = await fetch(`/api/scrape/[jobId]?jobId=${jobId}`);
-            if (res.ok) {
-              const data = await res.json();
-              setProgress({
-                jobId: data.job.id,
-                status: data.job.status,
-                progress: data.job.progress || 0,
-                total: data.job.total || 0,
-                currentChapter: data.job.currentChapter,
-                errorMessage: data.job.errorMessage,
-                done: data.job.status === 'completed' || data.job.status === 'error',
-              });
-
-              if (data.job.status === 'completed' || data.job.status === 'error') {
-                clearInterval(interval);
-                onComplete?.();
-              }
-            }
-          } catch {
-            // Ignore errors
-          }
-        }, 2000);
-
-        return () => clearInterval(interval);
-      }
-    };
-
-    connectSSE();
-
-    return () => {
-      controller.abort();
-    };
-  }, [jobId, onComplete]);
+    return () => clearInterval(interval);
+  }, [fetchProgress]);
 
   if (!progress) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex items-center space-x-3">
           <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-          <span className="text-gray-600">Connecting to progress tracker...</span>
+          <span className="text-gray-600">Loading progress...</span>
         </div>
       </div>
     );

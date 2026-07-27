@@ -72,6 +72,9 @@ async function runScrapeJob(jobId: number) {
       return num >= start && num <= end;
     });
 
+    // Sort ascending (smallest chapter first)
+    filteredChapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
+
     // Update job total
     await db
       .update(scrapeJobs)
