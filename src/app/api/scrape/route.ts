@@ -186,12 +186,17 @@ async function runScrapeJob(jobId: number) {
       }
     }
 
-    // Update manga totals
+    // Recalculate totals from ALL chapters in DB (not just current scrape range)
+    const allDbChapters = await db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.mangaId, mangaRecord.id));
+
     await db
       .update(manga)
       .set({
-        totalChapters: filteredChapters.length,
-        totalImages: totalImagesCount,
+        totalChapters: allDbChapters.length,
+        totalImages: allDbChapters.reduce((sum, ch) => sum + (ch.totalImages || 0), 0),
         statusDl: 'completed',
         updatedAt: new Date(),
       })
