@@ -23,11 +23,19 @@ export async function middleware(request: NextRequest) {
 
   if (isProtected) {
     if (!token) {
+      if (pathname.startsWith('/api')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
     const payload = await verifyToken(token);
     if (!payload) {
+      if (pathname.startsWith('/api')) {
+        const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        response.cookies.set('token', '', { maxAge: 0, path: '/' });
+        return response;
+      }
       const response = NextResponse.redirect(new URL('/login', request.url));
       response.cookies.set('token', '', { maxAge: 0, path: '/' });
       return response;
