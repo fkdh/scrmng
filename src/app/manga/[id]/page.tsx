@@ -220,7 +220,7 @@ function MangaDetailContent() {
 					{/* Thumbnail */}
 					<div className="w-full max-w-[16rem] md:max-w-[12rem] aspect-[3/4.5] bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 mx-auto md:mx-0">
 						{manga.thumbnail ? (
-							<img src={manga.thumbnail} alt={manga.title} className="w-full h-full object-cover" />
+							<img src={manga.thumbnail} alt={manga.title} className="w-full h-full object-cover" /> // eslint-disable-line @next/next/no-img-element
 						) : (
 							<div className="w-full h-full flex items-center justify-center">
 								<BookOpen className="w-12 h-12 text-gray-400" />
@@ -351,6 +351,7 @@ function MangaDetailContent() {
 			{/* Fullscreen Gallery Viewer */}
 			{selectedChapterData && currentChapterIndex >= 0 && (
 				<GalleryViewer
+					key={sortedChapters[currentChapterIndex]?.id}
 					mangaId={manga.id}
 					mangaTitle={manga.title}
 					mangaSlug={manga.slug}

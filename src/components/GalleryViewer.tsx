@@ -60,12 +60,16 @@ export default function GalleryViewer({
 	const dragStartRef = useRef({ x: 0, y: 0 });
 	const panStartRef = useRef({ x: 0, y: 0 });
 	const [showHelp, setShowHelp] = useState(false);
-	const [showChapterComplete, setShowChapterComplete] = useState(false);
+	const [dismissedChapterId, setDismissedChapterId] = useState<number | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const imageContainerRef = useRef<HTMLDivElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollContentRef = useRef<HTMLDivElement>(null);
-	const [readMode, setReadMode] = useState<ReadMode>("ltr");
+	const [readMode, setReadMode] = useState<ReadMode>(() => {
+		if (typeof window === "undefined") return "ltr";
+		const saved = localStorage.getItem("manga-read-mode") as ReadMode | null;
+		return saved === "ltr" || saved === "rtl" || saved === "scroll" ? saved : "ltr";
+	});
 	const scrollLockRef = useRef(false);
 
 	const chapter = chapters[currentChapterIndex];
@@ -81,14 +85,7 @@ export default function GalleryViewer({
 	const isFirstImage = currentImage <= 1;
 	const isPageMode = readMode === "ltr" || readMode === "rtl";
 	const isScrollMode = readMode === "scroll";
-
-	// Load mode from localStorage
-	useEffect(() => {
-		const saved = localStorage.getItem("manga-read-mode") as ReadMode | null;
-		if (saved && (saved === "ltr" || saved === "rtl" || saved === "scroll")) {
-			setReadMode(saved);
-		}
-	}, []);
+	const showChapterComplete = isLastImage && totalImages > 0 && chapter?.id !== dismissedChapterId;
 
 	// Save mode to localStorage
 	useEffect(() => {
@@ -122,26 +119,19 @@ export default function GalleryViewer({
 		return () => clearTimeout(timer);
 	}, [currentImage, chapter, mangaId]);
 
-	// Show chapter complete overlay on last image
-	useEffect(() => {
-		if (isLastImage && totalImages > 0) {
-			setShowChapterComplete(true);
-		} else {
-			setShowChapterComplete(false);
-		}
-	}, [currentImage, isLastImage, totalImages]);
-
 	const handlePrev = useCallback(() => {
 		if (currentImage > 1) {
 			setCurrentImage(currentImage - 1);
+			if (isPageMode) resetZoomAndPan();
 		}
-	}, [currentImage]);
+	}, [currentImage, isPageMode, resetZoomAndPan]);
 
 	const handleNext = useCallback(() => {
 		if (currentImage < totalImages) {
 			setCurrentImage(currentImage + 1);
+			if (isPageMode) resetZoomAndPan();
 		}
-	}, [currentImage, totalImages]);
+	}, [currentImage, totalImages, isPageMode, resetZoomAndPan]);
 
 	const goToNextChapter = useCallback(() => {
 		if (nextChapter) {
@@ -165,7 +155,6 @@ export default function GalleryViewer({
 	const goBack = readMode === "ltr" ? handlePrev : handleNext;
 	const goForward = readMode === "ltr" ? handleNext : handlePrev;
 	const isAtStart = readMode === "ltr" ? isFirstImage : isLastImage;
-	const isAtEnd = readMode === "ltr" ? isLastImage : isFirstImage;
 
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
@@ -330,24 +319,6 @@ export default function GalleryViewer({
 		}
 	}, [zoom, resetZoomAndPan]);
 
-	// Reset zoom and pan on image change (page mode)
-	useEffect(() => {
-		if (isPageMode) {
-			setZoom(1);
-			setPan({ x: 0, y: 0 });
-		}
-	}, [currentImage, isPageMode]);
-
-	// Reset current image when chapter changes
-	useEffect(() => {
-		setCurrentImage(1);
-		resetZoomAndPan();
-		setShowChapterComplete(false);
-		if (scrollContainerRef.current) {
-			scrollContainerRef.current.scrollTop = 0;
-		}
-	}, [chapter?.id, resetZoomAndPan]);
-
 	// Scroll mode: track current image based on scroll position + pan offset
 	useEffect(() => {
 		if (!isScrollMode) return;
@@ -405,7 +376,7 @@ export default function GalleryViewer({
 		setTimeout(() => {
 			scrollLockRef.current = false;
 		}, 100);
-	}, [zoom, isScrollMode]);
+	}, [zoom, isScrollMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Scroll mode: auto-scroll to current image on mode switch
 	useEffect(() => {
@@ -464,6 +435,7 @@ export default function GalleryViewer({
 							const val = parseInt(e.target.value, 10);
 							if (val >= 1 && val <= totalImages) {
 								setCurrentImage(val);
+								if (isPageMode) resetZoomAndPan();
 							}
 						}}
 						onFocus={(e) => e.target.select()}
@@ -568,6 +540,7 @@ export default function GalleryViewer({
 						onMouseDown={handleMouseDown}
 						onDoubleClick={handleDoubleClick}
 					>
+						{/* eslint-disable-next-line @next/next/no-img-element */}
 						<img
 							src={getImageUrl(currentImage)}
 							alt={`Page ${currentImage}`}
@@ -595,6 +568,7 @@ export default function GalleryViewer({
 					className="flex flex-col items-center py-4 gap-4"
 				>
 					{Array.from({ length: totalImages }, (_, i) => i + 1).map((index) => (
+						// eslint-disable-next-line @next/next/no-img-element
 						<img
 							key={index}
 							data-page={index}
@@ -673,7 +647,7 @@ export default function GalleryViewer({
 				<div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
 					<div className="bg-black/70 rounded-xl px-8 py-6 text-center relative">
 						<button
-							onClick={() => setShowChapterComplete(false)}
+							onClick={() => setDismissedChapterId(chapter?.id ?? null)}
 							className="absolute top-3 right-3 text-white/40 hover:text-white"
 						>
 							<X className="w-4 h-4" />
