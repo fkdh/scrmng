@@ -7,13 +7,14 @@ interface User {
   name: string;
   email: string;
   role: string | null;
+  isActive: boolean | null;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<{ pendingApproval?: boolean }>;
   logout: () => Promise<void>;
 }
 
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string): Promise<{ pendingApproval?: boolean }> => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    setUser(data.user);
+    return { pendingApproval: data.pendingApproval };
   };
 
   const logout = async () => {

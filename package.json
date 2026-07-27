@@ -10,13 +10,15 @@
     "lint": "eslint",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed-admin": "tsx --env-file=.env src/lib/db/seed-admin.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "jose": "^6.2.4",

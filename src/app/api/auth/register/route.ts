@@ -3,7 +3,7 @@ import { registerSchema } from '@/lib/schemas';
 import { ZodError } from 'zod';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
-import { hashPassword, generateToken, setAuthCookie } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
 
 export async function POST(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email sudah terdaftar' }, { status: 409 });
     }
 
-    // Create user
+    // Create user with customer role, inactive by default
     const passwordHash = await hashPassword(validated.password);
     const [user] = await db
       .insert(users)
@@ -28,25 +28,20 @@ export async function POST(req: NextRequest) {
         name: validated.name,
         email: validated.email,
         passwordHash,
+        role: 'customer',
+        isActive: false,
       })
       .returning({ id: users.id, name: users.name, email: users.email });
 
-    // Generate token
-    const token = await generateToken(user.id);
-
-    // Set cookie
-    const response = NextResponse.json(
+    // Don't set cookie — user must wait for admin approval
+    return NextResponse.json(
       {
-        message: 'Register berhasil',
+        message: 'Registrasi berhasil. Menunggu persetujuan admin.',
         user: { id: user.id, name: user.name, email: user.email },
+        pendingApproval: true,
       },
       { status: 201 }
     );
-
-    const cookieHeader = setAuthCookie(token);
-    response.headers.set('Set-Cookie', cookieHeader['Set-Cookie']);
-
-    return response;
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.errors[0].message }, { status: 400 });

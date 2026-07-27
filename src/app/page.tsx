@@ -3,7 +3,10 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Dashboard from '@/components/Dashboard';
 import SearchFilter from '@/components/SearchFilter';
+import ScrapeModal from '@/components/ScrapeModal';
+import { useAuth } from '@/components/AuthProvider';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Manga {
   id: number;
@@ -20,6 +23,9 @@ function HomePageContent() {
   const [mangaList, setMangaList] = useState<Manga[]>([]);
   const [filteredManga, setFilteredManga] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scrapeModal, setScrapeModal] = useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchManga() {
@@ -61,6 +67,20 @@ function HomePageContent() {
     [mangaList]
   );
 
+  const handleCreateScrape = async (url: string, startChapter: number, endChapter: number) => {
+    const res = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, startChapter, endChapter }),
+    });
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      throw new Error(result.error || 'Failed to start scraping');
+    }
+    const result = await res.json();
+    router.push(`/scrape/${result.job.id}`);
+  };
+
   const stats = {
     totalManga: filteredManga.length,
     totalChapters: filteredManga.reduce((sum, m) => sum + (m.totalChapters || 0), 0),
@@ -74,15 +94,27 @@ function HomePageContent() {
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
       </div>
 
-      <SearchFilter onFilterChange={handleFilterChange} />
+      <SearchFilter
+        onFilterChange={handleFilterChange}
+        stats={stats}
+        onNewScrape={() => setScrapeModal(true)}
+        isAdmin={user?.role === 'admin'}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-gray-500">Loading...</div>
         </div>
       ) : (
-        <Dashboard mangaList={filteredManga} stats={stats} />
+        <Dashboard mangaList={filteredManga} />
       )}
+
+      <ScrapeModal
+        open={scrapeModal}
+        mode="create"
+        onClose={() => setScrapeModal(false)}
+        onSubmit={handleCreateScrape}
+      />
     </div>
   );
 }

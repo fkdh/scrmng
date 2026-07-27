@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuth } from "@/components/AuthProvider";
 import ChapterList from "@/components/ChapterList";
 import GalleryViewer from "@/components/GalleryViewer";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -50,6 +51,7 @@ function MangaDetailContent() {
 	const params = useParams();
 	const searchParams = useSearchParams();
 	const router = useRouter();
+	const { user } = useAuth();
 	const [manga, setManga] = useState<Manga | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
@@ -308,24 +310,28 @@ function MangaDetailContent() {
 								<ExternalLink className="w-4 h-4" />
 								<span>View on source</span>
 							</a>
-							<Button
-								variant="success"
-								onClick={handleCheckUpdates}
-								disabled={checkingUpdates}
-								className="w-full sm:w-auto"
-								icon={<RefreshCw className={`w-4 h-4 ${checkingUpdates ? "animate-spin" : ""}`} />}
-							>
-								{checkingUpdates ? "Checking..." : "Check Updates"}
-							</Button>
-							<Button
-								variant="danger"
-								onClick={handleDelete}
-								disabled={deleting}
-								className="w-full sm:w-auto"
-								icon={<Trash2 className="w-4 h-4" />}
-							>
-								{deleting ? "Deleting..." : "Delete"}
-							</Button>
+							{user?.role === "admin" && (
+								<>
+									<Button
+										variant="success"
+										onClick={handleCheckUpdates}
+										disabled={checkingUpdates}
+										className="w-full sm:w-auto"
+										icon={<RefreshCw className={`w-4 h-4 ${checkingUpdates ? "animate-spin" : ""}`} />}
+									>
+										{checkingUpdates ? "Checking..." : "Check Updates"}
+									</Button>
+									<Button
+										variant="danger"
+										onClick={handleDelete}
+										disabled={deleting}
+										className="w-full sm:w-auto"
+										icon={<Trash2 className="w-4 h-4" />}
+									>
+										{deleting ? "Deleting..." : "Delete"}
+									</Button>
+								</>
+							)}
 						</div>
 					</div>
 				</div>

@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
     }
 
+    // Check if user is active
+    if (!user.isActive) {
+      return NextResponse.json({ error: 'Akun belum disetujui admin' }, { status: 403 });
+    }
+
     // Generate token
     const token = await generateToken(user.id);
 

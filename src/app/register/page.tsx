@@ -16,6 +16,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
   const [error, setError] = useState('');
+  const [pendingApproval, setPendingApproval] = useState(false);
   const {
     register,
     handleSubmit,
@@ -27,12 +28,44 @@ function RegisterForm() {
   const onSubmit = async (data: RegisterInput) => {
     setError('');
     try {
-      await registerUser(data.name, data.email, data.password);
-      router.push(redirect);
+      const result = await registerUser(data.name, data.email, data.password);
+      if (result.pendingApproval) {
+        setPendingApproval(true);
+      } else {
+        router.push(redirect);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     }
   };
+
+  if (pendingApproval) {
+    return (
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="w-8 h-8 text-yellow-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Menunggu Persetujuan</h1>
+          <p className="text-gray-500 mb-6">
+            Akun Anda telah dibuat dan menunggu persetujuan admin. Silakan coba login kembali nanti.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Kembali ke Login
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center px-4 py-2 mt-3 text-gray-600 font-medium rounded-lg hover:text-gray-900 transition-colors"
+          >
+            Kembali ke Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md">

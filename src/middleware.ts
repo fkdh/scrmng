@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth-edge';
 
 // Routes that require authentication
-const protectedRoutes = ['/', '/scrape', '/manga', '/api/scrape', '/api/manga'];
+const protectedRoutes = ['/', '/scrape', '/manga', '/users', '/history', '/api/scrape', '/api/manga', '/api/users'];
 
 // Routes that should redirect to dashboard if already logged in
 const authRoutes = ['/login', '/register'];

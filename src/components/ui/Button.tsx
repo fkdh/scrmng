@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 
 type Variant = "primary" | "secondary" | "danger" | "success" | "ghost" | "icon";
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "lg";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -29,6 +29,7 @@ const variantStyles: Record<Variant, string> = {
 const sizeStyles: Record<Size, string> = {
   sm: "px-3 py-1 text-sm rounded-md",
   md: "px-4 py-2 text-sm rounded-lg",
+  lg: "px-4 py-2 text-sm rounded-lg",
 };
 
 const iconOnlyStyle = "p-2 rounded-lg";

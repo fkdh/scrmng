@@ -5,7 +5,12 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole?: 'admin' | 'customer';
+}
+
+export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -26,6 +31,18 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!user) {
     return null;
+  }
+
+  // Check role
+  if (requiredRole && user.role !== requiredRole) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-500">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

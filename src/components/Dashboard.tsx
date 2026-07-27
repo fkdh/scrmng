@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { BookOpen, Download, CheckCircle, Clock, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, AlertCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAuth } from './AuthProvider';
 import ConfirmModal from './ConfirmModal';
 import Toast from './Toast';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import ScrapeModal from './ScrapeModal';
 
 interface Manga {
   id: number;
@@ -21,45 +20,47 @@ interface Manga {
   createdAt: Date | null;
 }
 
-interface Stats {
-  totalManga: number;
-  totalChapters: number;
-  totalImages: number;
-  pendingJobs: number;
+interface HistoryEntry {
+  mangaId: number;
+  chapterNumber: string;
+  lastImage: number;
+  totalImages: number | null;
 }
 
 interface DashboardProps {
   mangaList?: Manga[];
-  stats?: Stats;
 }
 
-export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }: DashboardProps) {
+export default function Dashboard({ mangaList: mangaListProp }: DashboardProps) {
   const mangaList = mangaListProp || [];
-  const stats = statsProp || { totalManga: 0, totalChapters: 0, totalImages: 0, pendingJobs: 0 };
-  const router = useRouter();
+  const { user } = useAuth();
 
-  const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
     open: false,
     title: '',
     message: '',
     onConfirm: () => {},
   });
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
-  const [scrapeModal, setScrapeModal] = useState(false);
+  const [userHistory, setUserHistory] = useState<Record<number, HistoryEntry>>({});
 
-  const handleCreateScrape = async (url: string, startChapter: number, endChapter: number) => {
-    const res = await fetch('/api/scrape', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, startChapter, endChapter }),
-    });
-    if (!res.ok) {
-      const result = await res.json().catch(() => ({}));
-      throw new Error(result.error || 'Failed to start scraping');
-    }
-    const result = await res.json();
-    router.push(`/scrape/${result.job.id}`);
-  };
+  useEffect(() => {
+    fetch('/api/users/history')
+      .then((res) => res.json())
+      .then((data) => {
+        const map: Record<number, HistoryEntry> = {};
+        (data.history || []).forEach((h: HistoryEntry & { mangaId: number }) => {
+          map[h.mangaId] = h;
+        });
+        setUserHistory(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleDelete = async (e: React.MouseEvent, mangaId: number, title: string) => {
     e.preventDefault();
@@ -83,70 +84,7 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <BookOpen className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Manga</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalManga}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-green-100 rounded-full">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Chapters</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalChapters}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-purple-100 rounded-full">
-              <Download className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Images</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalImages}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-amber-100 rounded-full">
-              <Clock className="w-6 h-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Active Jobs</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingJobs}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex justify-end">
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => setScrapeModal(true)}
-          icon={<Plus className="w-5 h-5" />}
-        >
-          New Scrape
-        </Button>
-      </div>
-
+    <div>
       {/* Manga List */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -157,60 +95,81 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
           <div className="px-6 py-12 text-center">
             <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">No manga yet. Start by scraping a manga!</p>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setScrapeModal(true)}
-              icon={<Plus className="w-5 h-5" />}
-              className="mt-4"
-            >
-              Start Scraping
-            </Button>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
             {mangaList.map((manga) => {
+              const history = userHistory[manga.id];
               return (
                 <Link
                   key={manga.id}
                   href={`/manga/${manga.id}`}
-                  className="flex items-center space-x-4 px-6 py-4 hover:bg-gray-50 transition-colors"
+                  className="flex items-start space-x-3 px-4 py-3 sm:items-center sm:space-x-5 sm:px-6 sm:py-4 hover:bg-gray-50 transition-colors"
                 >
                   {/* Thumbnail */}
-                  <div className="w-16 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                  <div className="w-12 h-16 sm:w-20 sm:h-28 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                     {manga.thumbnail ? (
-                      <img
-                        src={manga.thumbnail}
-                        alt={manga.title}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={manga.thumbnail} alt={manga.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-8 h-8 text-gray-400" />
+                        <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate">{manga.title}</h3>
-                    <p className="text-sm text-gray-500">{manga.source}</p>
-                    <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-                      <span>{manga.totalChapters || 0} chapters</span>
-                      <span>{manga.totalImages || 0} images</span>
+                    {/* Mobile: stacked layout */}
+                    <div className="sm:hidden">
+                      <h3 className="font-medium text-gray-900 truncate">{manga.title}</h3>
+                      <p className="text-sm text-gray-500 mt-0.5">{manga.source}</p>
+                      <p className="text-sm text-gray-500 mt-0.5">{manga.totalImages || 0} images</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm text-gray-500">{manga.totalChapters || 0} chapters</span>
+                        <Badge status={(manga.statusDl as 'pending' | 'downloading' | 'completed' | 'error') || 'pending'} />
+                      </div>
+                      {history && (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>chapter {parseFloat(history.chapterNumber).toString()}</span>
+                          <span>page {history.lastImage}/{history.totalImages || '?'}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Desktop: horizontal layout */}
+                    <div className="hidden sm:block">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-gray-900 truncate">{manga.title}</h3>
+                        <Badge status={(manga.statusDl as 'pending' | 'downloading' | 'completed' | 'error') || 'pending'} />
+                      </div>
+                      <p className="text-sm text-gray-500">{manga.source}</p>
+                      <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                        <span>{manga.totalChapters || 0} chapters</span>
+                        <span>{manga.totalImages || 0} images</span>
+                      </div>
+                      {history && (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>chapter {parseFloat(history.chapterNumber).toString()}</span>
+                          <span>page {history.lastImage}/{history.totalImages || '?'}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Status Badge */}
-                  <Badge status={(manga.statusDl as "pending" | "downloading" | "completed" | "error") || "pending"} />
-
-                  {/* Delete Button */}
-                  <Button
-                    variant="danger"
-                    onClick={(e) => handleDelete(e, manga.id, manga.title)}
-                    title="Delete manga"
-                    icon={<Trash2 className="w-4 h-4" />}
-                  />
+                  {/* Right side: delete */}
+                  <div className="flex items-center gap-2 sm:ml-4 mt-1 sm:mt-0 flex-shrink-0">
+                    {user?.role === 'admin' && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={(e) => handleDelete(e, manga.id, manga.title)}
+                        title="Delete manga"
+                        icon={<Trash2 className="w-4 h-4" />}
+                      />
+                    )}
+                  </div>
                 </Link>
               );
             })}
@@ -228,16 +187,7 @@ export default function Dashboard({ mangaList: mangaListProp, stats: statsProp }
         onCancel={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
       />
 
-      <ScrapeModal
-        open={scrapeModal}
-        mode="create"
-        onClose={() => setScrapeModal(false)}
-        onSubmit={handleCreateScrape}
-      />
-
-      {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
