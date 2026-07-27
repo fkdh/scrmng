@@ -239,6 +239,10 @@ scrmng/
                 └── komiku.adapter.ts
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit conventions, branch naming, and guidelines.
+
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
