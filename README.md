@@ -37,19 +37,49 @@ Multi-source manga scraper with Next.js dashboard, PostgreSQL, and adapter patte
 
 ### Dashboard & Management
 
-- **Manga collection** — grid view with thumbnails, chapters count, download status
+- **Stats panel** — total manga, chapters, images, active jobs
 - **Search & filter** — by title, source, download status
-- **Delete manga** — confirmation modal, removes files from disk
-- **Source link** — quick access to original manga website
-- **Responsive design** — works on mobile and desktop
-- **Reusable UI components** — Button (6 variants), Badge, Toast, ConfirmModal
+- **New Scrape button** — integrated in search panel (admin only)
+- **Reading history badges** — shows last read chapter + page on manga cards
+- **Delete manga** — confirmation modal, removes files from disk (admin only)
+- **Responsive design** — optimized layout for mobile and desktop
+
+### User Management (Admin)
+
+- **Role-based access control** — admin and customer roles
+- **Approval flow** — new users require admin approval before login
+- **User management page** — approve, reject, change roles, activate/deactivate
+- **3-dot dropdown menu** — mobile-friendly actions for each user
+
+### Reading History
+
+- **Per-user tracking** — each user has separate reading history
+- **History page** — list of all manga with reading progress
+- **Lanjut Baca** — continue reading from last position
+- **Progress display** — chapter number + page (e.g., "Ch 30 page 7")
+
+### Navigation
+
+- **Avatar dropdown menu** — Profile, History, Logout
+- **Mobile hamburger drawer** — slide-in navigation for mobile
+- **Desktop nav links** — Dashboard, Manage Users (admin)
 
 ### Authentication & Security
 
 - **Custom JWT auth** — register, login, logout
+- **Role-based access** — admin-only routes and actions
 - **Protected routes** — middleware-based route guard
 - **Edge-compatible** — token verification runs on Edge Runtime
 - **Stale cookie handling** — auto-clears invalid tokens on 401
+
+### Reusable Components
+
+- **Button** — 6 variants (primary, secondary, danger, success, ghost, icon), 3 sizes (sm, md, lg)
+- **Badge** — status indicators (pending, downloading, completed, error)
+- **DropdownMenu** — configurable dropdown with icons, dividers, danger items
+- **Drawer** — mobile slide-in panel with backdrop
+- **Toast** — notification system
+- **ConfirmModal** — confirmation dialog
 
 ## Prerequisites
 
@@ -93,7 +123,15 @@ DB_PASSWORD=your_password_database
 npm run db:push
 ```
 
-### 5. Run development server
+### 5. Seed admin user
+
+```bash
+npm run db:seed-admin
+```
+
+Default admin: `admin@admin.com` / `admin123`
+
+### 6. Run development server
 
 ```bash
 npm run dev
@@ -101,17 +139,66 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+## Local Network Access (WSL2)
+
+To access the app from other devices on your local network (e.g., phone) while running WSL2:
+
+### 1. Run dev server with network access
+
+```bash
+npm run dev:lan
+```
+
+### 2. Find your WSL IP
+
+```bash
+hostname -I
+# Example output: 172.20.169.144
+```
+
+### 3. Set up port forwarding (Windows PowerShell as Admin)
+
+```powershell
+netsh interface portproxy add v4tov4 listenport=3000 listenaddress=0.0.0.0 connectport=3000 connectaddress=172.20.169.144
+```
+
+### 4. Find your Windows IP
+
+Open PowerShell/CMD on Windows:
+
+```cmd
+ipconfig
+```
+
+Look for `IPv4 Address` under your WiFi/Ethernet adapter (e.g., `192.168.1.100`).
+
+### 5. Access from your phone
+
+Open **`http://<WINDOWS_IP>:3000`** on your phone browser.
+
+### Useful commands
+
+```powershell
+# Show port forwarding rules
+netsh interface portproxy show all
+
+# Remove port forwarding
+netsh interface portproxy delete v4tov4 listenport=3000 listenaddress=0.0.0.0
+```
+
 ## Scripts
 
-| Command               | Description              |
-| --------------------- | ------------------------ |
-| `npm run dev`         | Start dev server         |
-| `npm run build`       | Build for production     |
-| `npm run start`       | Start production server  |
-| `npm run lint`        | Run ESLint               |
-| `npm run db:push`     | Push schema to database  |
-| `npm run db:generate` | Generate migration files |
-| `npm run db:migrate`  | Run migrations           |
+| Command                | Description                         |
+| ---------------------- | ----------------------------------- |
+| `npm run dev`          | Start dev server (localhost only)   |
+| `npm run dev:lan`      | Start dev server (all interfaces)   |
+| `npm run build`        | Build for production                |
+| `npm run start`        | Start production server             |
+| `npm run lint`         | Run ESLint                          |
+| `npm run db:push`      | Push schema to database             |
+| `npm run db:generate`  | Generate migration files            |
+| `npm run db:migrate`   | Run migrations                      |
+| `npm run db:seed-admin`| Seed admin user                     |
 
 ## Project Structure
 
@@ -128,6 +215,9 @@ scrmng/
 ├── postcss.config.mjs            # PostCSS (Tailwind)
 ├── tsconfig.json
 ├── output/                       # Downloaded manga images (gitignored)
+├── drizzle/                      # Database migrations
+│   ├── 0000_watery_spiral.sql
+│   └── meta/
 ├── public/                       # Static assets
 │   └── *.svg
 └── src/
@@ -138,9 +228,10 @@ scrmng/
     │   ├── globals.css           # Global styles
     │   ├── login/page.tsx        # Login page
     │   ├── register/page.tsx     # Register page
+    │   ├── history/page.tsx      # Reading history page
+    │   ├── users/page.tsx        # User management (admin)
     │   ├── manga/[id]/page.tsx   # Manga detail + reader
     │   ├── scrape/
-    │   │   ├── page.tsx          # Scrape form
     │   │   └── [jobId]/page.tsx  # Job progress tracker
     │   └── api/
     │       ├── auth/
@@ -156,31 +247,37 @@ scrmng/
     │       │       ├── chapters/route.ts
     │       │       ├── history/route.ts     # Reading history
     │       │       └── check-updates/route.ts
+    │       ├── users/
+    │       │   ├── route.ts                 # List users (admin)
+    │       │   ├── history/route.ts         # All user history
+    │       │   └── [id]/route.ts            # Update user (admin)
     │       └── scrape/
     │           ├── route.ts                 # Create scrape job
-    │           ├── [jobId]/route.ts         # Get job status
-    │           └── progress/route.ts        # Job progress SSE
+    │           └── [jobId]/route.ts         # Get job status
     ├── components/
     │   ├── ui/
-    │   │   ├── Button.tsx        # Reusable button (6 variants)
-    │   │   └── Badge.tsx         # Status badge
+    │   │   ├── Button.tsx        # Reusable button (6 variants, 3 sizes)
+    │   │   ├── Badge.tsx         # Status badge
+    │   │   ├── DropdownMenu.tsx  # Reusable dropdown menu
+    │   │   └── Drawer.tsx        # Mobile slide-in drawer
     │   ├── AuthProvider.tsx       # Auth context provider
     │   ├── ChapterList.tsx        # Chapter list with status/history
     │   ├── ConfirmModal.tsx       # Confirmation dialog
-    │   ├── Dashboard.tsx          # Manga collection grid
+    │   ├── Dashboard.tsx          # Manga collection list
     │   ├── GalleryViewer.tsx      # Fullscreen manga reader
-    │   ├── Navbar.tsx             # Navigation bar
+    │   ├── Navbar.tsx             # Navigation with avatar dropdown
     │   ├── ProgressTracker.tsx    # Scrape progress display
-    │   ├── ProtectedRoute.tsx     # Route guard wrapper
-    │   ├── ScrapeForm.tsx         # Scrape URL input form
-    │   ├── SearchFilter.tsx       # Search & filter controls
+    │   ├── ProtectedRoute.tsx     # Route guard with role support
+    │   ├── ScrapeModal.tsx        # Scrape URL input modal
+    │   ├── SearchFilter.tsx       # Search, filter, stats panel
     │   └── Toast.tsx              # Toast notifications
     └── lib/
         ├── auth.ts                # Auth functions (jose + bcryptjs)
         ├── auth-edge.ts           # Edge-safe token verification
         ├── db/
         │   ├── index.ts           # Drizzle DB connection
-        │   └── schema.ts          # Database schema (5 tables)
+        │   ├── schema.ts          # Database schema (5 tables)
+        │   └── seed-admin.ts      # Admin user seeder
         ├── schemas/               # Zod validation schemas
         │   ├── auth.schema.ts
         │   ├── chapter.schema.ts
