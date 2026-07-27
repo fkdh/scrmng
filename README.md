@@ -32,10 +32,10 @@ Multi-source manga scraper with Next.js dashboard, PostgreSQL, and adapter patte
 ### 1. Start PostgreSQL
 
 ```bash
-docker run -d --name db-postgre \
-  -e POSTGRES_USER=your_username \
-  -e POSTGRES_PASSWORD=your_password \
-  -e POSTGRES_DB=your_database \
+docker run -d --name db-postgre-container-name \
+  -e POSTGRES_USER=your_username_database \
+  -e POSTGRES_PASSWORD=your_password_database \
+  -e POSTGRES_DB=your_database_name \
   -p 5432:5432 \
   postgres:16
 ```
@@ -53,9 +53,9 @@ Copy `.env` and edit if needed:
 ```env
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=your_database
-DB_USER=your_username
-DB_PASSWORD=your_password
+DB_NAME=your_database_name
+DB_USER=your_username_database
+DB_PASSWORD=your_password_database
 ```
 
 ### 4. Push database schema
@@ -74,15 +74,15 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start dev server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run db:push` | Push schema to database |
+| Command               | Description              |
+| --------------------- | ------------------------ |
+| `npm run dev`         | Start dev server         |
+| `npm run build`       | Build for production     |
+| `npm run start`       | Start production server  |
+| `npm run lint`        | Run ESLint               |
+| `npm run db:push`     | Push schema to database  |
 | `npm run db:generate` | Generate migration files |
-| `npm run db:migrate` | Run migrations |
+| `npm run db:migrate`  | Run migrations           |
 
 ## Project Structure
 
