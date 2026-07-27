@@ -114,8 +114,13 @@ async function runScrapeJob(jobId: number) {
             })
             .returning();
           chapterRecord = newChapter;
+        } else if (chapterRecord.status === 'completed') {
+          // Already downloaded — skip
+          completedCount++;
+          totalImagesCount += chapterRecord.totalImages || 0;
+          continue;
         } else {
-          // Update status to downloading
+          // Re-download incomplete/errored chapters
           await db
             .update(chapters)
             .set({ status: 'downloading' })
